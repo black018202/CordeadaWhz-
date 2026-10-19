@@ -1,0 +1,189 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- 1. CRIAR GUI PRINCIPAL
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MenuCoordenadasGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Frame Principal (Janela Movel)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 300, 0, 310)
+mainFrame.Position = UDim2.new(0.5, -150, 0.4, -155)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 39, 42)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+-- BARRA DE TÍTULO (Para arrastar)
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(24, 25, 28)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -10, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "::: Arraste o Menu Aqui :::"
+titleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 14
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+-- SISTEMA DE ARRASTAR (DRAGGABLE)
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	mainFrame.Position = UDim2.new(
+		startPos.X.Scale, startPos.X.Offset + delta.X,
+		startPos.Y.Scale, startPos.Y.Offset + delta.Y
+	)
+end
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+-- VARIÁVEL DE ARMAZENAMENTO DA COORDENADA
+local coordenadaSalva = nil
+
+-- FUNÇÃO PARA CRIAR BOTÕES FACILMENTE
+local function criarBotao(texto, cor, ordem)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -30, 0, 35)
+	btn.Position = UDim2.new(0, 15, 0, 45 + (ordem * 42))
+	btn.BackgroundColor3 = cor
+	btn.Text = texto
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 15
+	btn.Parent = mainFrame
+	
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = btn
+	
+	return btn
+end
+
+-- 2. BOTÕES
+local btnSalvar = criarBotao("1. Salvar Coordenada Atual", Color3.fromRGB(52, 152, 219), 0)
+local btnExcluir = criarBotao("2. Excluir Coordenada", Color3.fromRGB(231, 76, 60), 1)
+local btnMostrar = criarBotao("3. Mostrar Código da Coordenada", Color3.fromRGB(155, 89, 182), 2)
+
+-- 3. ÁREA INFERIOR DE TEXTO (COR VERDE)
+local outputBox = Instance.new("TextBox")
+outputBox.Size = UDim2.new(1, -75, 0, 35)
+outputBox.Position = UDim2.new(0, 15, 0, 180)
+outputBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+outputBox.TextColor3 = Color3.fromRGB(46, 204, 113) -- COR VERDE
+outputBox.Text = "Nenhuma coordenada salva"
+outputBox.Font = Enum.Font.Code
+outputBox.TextSize = 13
+outputBox.ClearTextOnFocus = false
+outputBox.TextEditable = true -- Permite selecionar o texto
+outputBox.Parent = mainFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 6)
+boxCorner.Parent = outputBox
+
+-- BOTÃO COPIAR (Facilita a cópia no Roblox/Clipboard)
+local btnCopiar = Instance.new("TextButton")
+btnCopiar.Size = UDim2.new(0, 35, 0, 35)
+btnCopiar.Position = UDim2.new(1, -50, 0, 180)
+btnCopiar.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+btnCopiar.Text = "📋"
+btnCopiar.TextSize = 16
+btnCopiar.Parent = mainFrame
+
+local copyCorner = Instance.new("UICorner")
+copyCorner.CornerRadius = UDim.new(0, 6)
+copyCorner.Parent = btnCopiar
+
+-- 4. LÓGICA DOS BOTÕES
+
+-- Botão 1: Salvar Coordenada do Personagem
+btnSalvar.MouseButton1Click:Connect(function()
+	local character = player.Character
+	if character and character:FindFirstChild("HumanoidRootPart") then
+		local pos = character.HumanoidRootPart.Position
+		-- Salva com arredondamento de 2 casas decimais
+		coordenadaSalva = Vector3.new(
+			math.floor(pos.X * 100) / 100,
+			math.floor(pos.Y * 100) / 100,
+			math.floor(pos.Z * 100) / 100
+		)
+		outputBox.Text = string.format("X: %.2f, Y: %.2f, Z: %.2f", coordenadaSalva.X, coordenadaSalva.Y, coordenadaSalva.Z)
+	else
+		outputBox.Text = "Personagem não encontrado!"
+	end
+end)
+
+-- Botão 2: Excluir
+btnExcluir.MouseButton1Click:Connect(function()
+	coordenadaSalva = nil
+	outputBox.Text = "Coordenada excluída"
+end)
+
+-- Botão 3: Mostrar Código de Cordenada (Vector3 ou Teleport)
+btnMostrar.MouseButton1Click:Connect(function()
+	if coordenadaSalva then
+		local codigo = string.format("Vector3.new(%.2f, %.2f, %.2f)", coordenadaSalva.X, coordenadaSalva.Y, coordenadaSalva.Z)
+		outputBox.Text = codigo
+	else
+		outputBox.Text = "Salve uma coordenada primeiro!"
+	end
+end)
+
+-- Botão Copiar (Copia o texto direto para o Clipboard do sistema se suportado por Executor/Plugin, ou foca o texto)
+btnCopiar.MouseButton1Click:Connect(function()
+	if setclipboard then
+		setclipboard(outputBox.Text)
+		btnCopiar.Text = "✓"
+		task.wait(1)
+		btnCopiar.Text = "📋"
+	else
+		outputBox:CaptureFocus()
+		outputBox.CursorPosition = #outputBox.Text + 1
+		outputBox.SelectionStart = 1
+	end
+end)
